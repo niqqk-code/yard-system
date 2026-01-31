@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>End of Day Summary</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container py-4">
+
+  <h5 class="mb-3">📊 End of Day Summary</h5>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <p><strong>Attendant:</strong> <span id="attendantName">Loading...</span></p>
+      <p><strong>Post:</strong> <span id="postName">---</span></p>
+      <p><strong>Date:</strong> <span id="todayDate">---</span></p>
+    </div>
+  </div>
+
+  <!-- Totals Table -->
+  <table class="table table-bordered bg-white mb-3">
+    <thead>
+      <tr>
+        <th>Metric</th>
+        <th>Amount (KES)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Total Purchases</td>
+        <td id="totalPurchases">0.00</td>
+      </tr>
+      <tr>
+        <td>Total Expenses</td>
+        <td id="totalExpenses">0.00</td>
+      </tr>
+      <tr>
+        <td>Total Cash Top-Ups</td>
+        <td id="totalTopUps">0.00</td>
+      </tr>
+      <tr>
+        <td>Opening Cash</td>
+        <td id="openingCash">0.00</td>
+      </tr>
+      <tr>
+        <td><strong>Closing Cash</strong></td>
+        <td id="closingCash">0.00</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <button class="btn btn-success w-100" onclick="closeDay()">Close Day</button>
+  <a href="dashboard.html" class="btn btn-secondary w-100 mt-2">Back to Dashboard</a>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, doc, getDoc, query, where, getDocs, setDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCquNEhCHVkSKDcyOqcczE4eSY3lkrAgOk",
+  authDomain: "yard-management-system-8e53a.firebaseapp.com",
+  projectId: "yard-management-system-8e53a",
+  storageBucket: "yard-management-system-8e53a.appspot.com",
+  messagingSenderId: "268321054164",
+  appId: "1:268321054164:web:b3188cc5080ad6f4ec8a41"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const attendantNameEl = document.getElementById("attendantName");
+const postNameEl = document.getElementById("postName");
+const todayDateEl = document.getElementById("todayDate");
+
+const totalPurchasesEl = document.getElementById("totalPurchases");
+const totalExpensesEl = document.getElementById("totalExpenses");
+const totalTopUpsEl = document.getElementById("totalTopUps");
+const openingCashEl = document.getElementById("openingCash");
+const closingCashEl = document.getElementById("closingCash");
+
+function today() {
+  return new Date().toISOString().split("T")[0];
+}
+
+let currentUser = null;
+let openingCash = 0;
+let topUps = 0;
+let totalPurchases = 0;
+let totalExpenses = 0;
+
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.replace("login.html");
+    return;
+  }
+  currentUser = user;
+
+  const userSnap = await getDoc(doc(db, "users", user.uid));
+  if (!userSnap.exists()) {
+    alert("User profile missing.");
+    window.location.replace("dashboard.html");
+    return;
+  }
+
+  attendantNameEl.textContent = userSnap.data().fullName;
+  postNameEl.textContent = userSnap.data().postName;
+  todayDateEl.textContent = today();
+
+  // Load opening cash & top-ups
+  const cashSnap = await getDoc(doc(db, "cash_sessions", user.uid + "_" + today()));
+  openingCash = cashSnap.exists() ? cashSnap.data().openingCash || 0 : 0;
+  topUps = cashSnap.exists() ? cashSnap.data().cashTopUps || 0 : 0;
+
+  openingCashEl.textContent = openingCash.toLocaleString();
+  totalTopUpsEl.textContent = topUps.toLocaleString();
+
+  // Load today's purchases
+  const purchasesQ = query(collection(db, "purchases"), where("attendantId", "==", user.uid));
+  const purchasesSnap = await getDocs(purchasesQ);
+  totalPurchases = 0;
+  purchasesSnap.forEach(p => {
+    const data = p.data();
+    const createdAt = data.createdAt?.toDate ? data.createdAt.toDate() : new Date();
+    if (createdAt.toISOString().split("T")[0] === today()) {
+      totalPurchases += data.total || 0;
+    }
+  });
+  totalPurchasesEl.textContent = totalPurchases.toLocaleString();
+
+  // Load today's expenses
+  const expensesQ = query(collection(db, "expenses"), where("attendantId", "==", user.uid));
+  const expensesSnap = await getDocs(expensesQ);
+  totalExpenses = 0;
+  expensesSnap.forEach(e => {
+    const data = e.data();
+    if (data.date === today()) totalExpenses += data.amount || 0;
+  });
+  totalExpensesEl.textContent = totalExpenses.toLocaleString();
+
+  // Calculate closing cash
+  const closing = openingCash + topUps - totalPurchases - totalExpenses;
+  closingCashEl.textContent = closing.toLocaleString();
+});
+
+window.closeDay = async function() {
+  if (!currentUser) return;
+  const closing = openingCash + topUps - totalPurchases - totalExpenses;
+
+  // Save closing cash for next day
+  await setDoc(doc(db, "cash_sessions", currentUser.uid + "_" + today()), {
+    closingCash: closing,
+    closedAt: serverTimestamp()
+  }, { merge:true });
+
+  alert("Day closed successfully! Closing cash saved.");
+};
+</script>
+
+</body>
+</html>
+<style>
+/* ===== SYSTEM THEME: BLUE & WHITE ===== */
+
+body {
+  background-color: #f0f4f8;
+  color: #0d1b2a;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+h4, h5, h6 {
+  color: #1e3a8a; /* Dark blue headers */
+}
+
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+}
+
+.card-header {
+  background-color: #1e40af; /* Medium blue */
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.btn {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.btn-success {
+  background-color: #2563eb; /* Blue button instead of green */
+  border-color: #2563eb;
+}
+
+.btn-success:hover {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.btn-outline-primary {
+  color: #1e40af;
+  border-color: #1e40af;
+}
+
+.btn-outline-primary:hover {
+  background-color: #1e40af;
+  color: white;
+}
+
+.btn-outline-danger {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc2626;
+  color: white;
+}
+
+.table thead {
+  background-color: #2563eb;
+  color: white;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(37, 99, 235, 0.1);
+}
+
+input.form-control {
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  padding: 0.5rem;
+}
+
+input.form-control:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+select.form-select {
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  padding: 0.5rem;
+}
+
+select.form-select:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+.card-body p, .card-body label {
+  color: #0d1b2a;
+}
+
+.btn-danger {
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
+.btn-danger:hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+/* Highlight editable cells on hover */
+td[contenteditable="true"]:hover {
+  background-color: rgba(37, 99, 235, 0.1);
+  outline: 1px solid #2563eb;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .row.g-2 > .col-md-*, .col-md-6, .col-md-3 {
+    flex: 100%;
+    max-width: 100%;
+  }
+}
+</style>

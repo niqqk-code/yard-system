@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Today's Summary</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<div class="container py-4">
+  <h5 class="mb-3">📅 Today's Summary</h5>
+
+  <!-- Purchases -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header">🛒 Purchases</div>
+    <div class="card-body p-0">
+      <table class="table table-striped m-0">
+        <thead class="table-light">
+          <tr>
+            <th>Item</th>
+            <th>Weight (KG)</th>
+            <th>Price/KG (KES)</th>
+            <th>Total (KES)</th>
+          </tr>
+        </thead>
+        <tbody id="purchaseTable">
+          <tr><td colspan="4" class="text-center">Loading...</td></tr>
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th colspan="3">Total Purchases</th>
+            <th id="totalPurchases">0.00</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Expenses -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header">💸 Expenses</div>
+    <div class="card-body p-0">
+      <table class="table table-striped m-0">
+        <thead class="table-light">
+          <tr>
+            <th>Description</th>
+            <th>Amount (KES)</th>
+          </tr>
+        </thead>
+        <tbody id="expenseTable">
+          <tr><td colspan="2" class="text-center">Loading...</td></tr>
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th>Total Expenses</th>
+            <th id="totalExpenses">0.00</th>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- Cash Summary -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header">💰 Cash Summary</div>
+    <div class="card-body">
+      <p>Opening Cash: KES <strong><span id="openingCash">0.00</span></strong></p>
+      <p>Total Top-Ups: KES <strong><span id="totalTopUps">0.00</span></strong></p>
+      <hr>
+      <p class="fw-bold text-success">
+        Closing Cash: KES <span id="closingCash">0.00</span>
+      </p>
+      <div class="mb-3">
+        <label>Physical Cash Count (KES)</label>
+        <input type="number" id="physicalCash" class="form-control" placeholder="Enter physical cash">
+      </div>
+      <p>Variance: KES <strong><span id="variance">0.00</span></strong></p>
+    </div>
+  </div>
+
+  <button class="btn btn-danger w-100 mb-3" id="closeDayBtn">🔒 Close Day & Submit Cash</button>
+  <a href="dashboard.html" class="btn btn-secondary w-100">⬅ Back to Dashboard</a>
+</div>
+
+<script type="module">
+import {
+  initializeApp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+  getAuth,
+  onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  updateDoc,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCquNEhCHVkSKDcyOqcczE4eSY3lkrAgOk",
+  authDomain: "yard-management-system-8e53a.firebaseapp.com",
+  projectId: "yard-management-system-8e53a",
+  storageBucket: "yard-management-system-8e53a.appspot.com",
+  messagingSenderId: "268321054164",
+  appId: "1:268321054164:web:b3188cc5080ad6f4ec8a41"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const purchaseTable = document.getElementById("purchaseTable");
+const expenseTable = document.getElementById("expenseTable");
+const totalPurchasesEl = document.getElementById("totalPurchases");
+const totalExpensesEl = document.getElementById("totalExpenses");
+const openingCashEl = document.getElementById("openingCash");
+const totalTopUpsEl = document.getElementById("totalTopUps");
+const closingCashEl = document.getElementById("closingCash");
+const physicalCashInput = document.getElementById("physicalCash");
+const varianceEl = document.getElementById("variance");
+const closeBtn = document.getElementById("closeDayBtn");
+
+function todayString() {
+  return new Date().toISOString().split("T")[0];
+}
+
+function formatKES(n) {
+  return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
+}
+
+function isToday(ts) {
+  if(!ts) return false;
+  const d = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
+  return d.toISOString().split("T")[0] === todayString();
+}
+
+// Load data
+onAuthStateChanged(auth, async (user) => {
+  if (!user) location.href = "login.html";
+
+  const uid = user.uid;
+  const today = todayString();
+
+  let openingCash = 0, totalTopUps = 0;
+
+  const cashSnap = await getDoc(doc(db, "cash_sessions", uid + "_" + today));
+  if (cashSnap.exists()) {
+    openingCash = cashSnap.data().openingCash || 0;
+    const topUps = Array.isArray(cashSnap.data().cashTopUps) ? cashSnap.data().cashTopUps : [];
+    totalTopUps = topUps.reduce((sum,t)=>sum+(t.amount||0),0);
+  }
+
+  openingCashEl.textContent = formatKES(openingCash);
+  totalTopUpsEl.textContent = formatKES(totalTopUps);
+
+  // Purchases
+  let totalPurchases = 0;
+  purchaseTable.innerHTML = "";
+  const purchasesSnap = await getDocs(collection(db, "purchases"));
+  const todaysPurchases = purchasesSnap.docs.filter(d => d.data().attendantId === uid && (d.data().date===today || isToday(d.data().createdAt)));
+  if(todaysPurchases.length===0){
+    purchaseTable.innerHTML = `<tr><td colspan="4" class="text-center">No purchases today</td></tr>`;
+  } else {
+    todaysPurchases.forEach(d=>{
+      const p=d.data();
+      totalPurchases += Number(p.total||0);
+      purchaseTable.innerHTML += `<tr>
+        <td>${p.item||"-"}</td>
+        <td>${p.weightKg||0}</td>
+        <td>${formatKES(p.pricePerKg)}</td>
+        <td>${formatKES(p.total)}</td>
+      </tr>`;
+    });
+  }
+  totalPurchasesEl.textContent = formatKES(totalPurchases);
+
+  // Expenses
+  let totalExpenses = 0;
+  expenseTable.innerHTML = "";
+  const expensesSnap = await getDocs(collection(db, "expenses"));
+  const todaysExpenses = expensesSnap.docs.filter(d => d.data().attendantId === uid && (d.data().date===today || isToday(d.data().createdAt)));
+  if(todaysExpenses.length===0){
+    expenseTable.innerHTML = `<tr><td colspan="2" class="text-center">No expenses today</td></tr>`;
+  } else {
+    todaysExpenses.forEach(d=>{
+      const e=d.data();
+      totalExpenses += Number(e.amount||0);
+      expenseTable.innerHTML += `<tr>
+        <td>${e.description||e.reason||"-"}</td>
+        <td>${formatKES(e.amount)}</td>
+      </tr>`;
+    });
+  }
+  totalExpensesEl.textContent = formatKES(totalExpenses);
+
+  // Closing cash & total spend
+  const totalSpend = totalPurchases + totalExpenses;
+  const closingCash = openingCash + totalTopUps - totalSpend;
+  closingCashEl.textContent = formatKES(closingCash);
+
+  // Variance calculation
+  function updateVariance() {
+    const physical = Number(physicalCashInput.value||0);
+    varianceEl.textContent = formatKES(physical - closingCash);
+  }
+  physicalCashInput.addEventListener("input", updateVariance);
+
+  // Close Day button
+  closeBtn.onclick = async () => {
+    if (!confirm("Are you sure you want to close the day? This cannot be undone.")) return;
+
+    const cashRef = doc(db, "cash_sessions", uid + "_" + today);
+    await updateDoc(cashRef,{
+      closingCash: closingCash,
+      totalPurchases: totalPurchases,
+      totalExpenses: totalExpenses,
+      physicalCash: Number(physicalCashInput.value||0),
+      variance: Number(physicalCashInput.value||0) - closingCash,
+      closed: true,
+      closedAt: serverTimestamp()
+    });
+    alert("Day closed successfully");
+    closeBtn.disabled = true;
+  };
+});
+</script>
+
+</body>
+</html>
+<style>
+/* ===== SYSTEM THEME: BLUE & WHITE ===== */
+
+body {
+  background-color: #f0f4f8;
+  color: #0d1b2a;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+h4, h5, h6 {
+  color: #1e3a8a; /* Dark blue headers */
+}
+
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+}
+
+.card-header {
+  background-color: #1e40af; /* Medium blue */
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.btn {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.btn-success {
+  background-color: #2563eb; /* Blue button instead of green */
+  border-color: #2563eb;
+}
+
+.btn-success:hover {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.btn-outline-primary {
+  color: #1e40af;
+  border-color: #1e40af;
+}
+
+.btn-outline-primary:hover {
+  background-color: #1e40af;
+  color: white;
+}
+
+.btn-outline-danger {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc2626;
+  color: white;
+}
+
+.table thead {
+  background-color: #2563eb;
+  color: white;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(37, 99, 235, 0.1);
+}
+
+input.form-control {
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  padding: 0.5rem;
+}
+
+input.form-control:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+select.form-select {
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  padding: 0.5rem;
+}
+
+select.form-select:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+.card-body p, .card-body label {
+  color: #0d1b2a;
+}
+
+.btn-danger {
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
+.btn-danger:hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+/* Highlight editable cells on hover */
+td[contenteditable="true"]:hover {
+  background-color: rgba(37, 99, 235, 0.1);
+  outline: 1px solid #2563eb;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .row.g-2 > .col-md-*, .col-md-6, .col-md-3 {
+    flex: 100%;
+    max-width: 100%;
+  }
+}
+</style>

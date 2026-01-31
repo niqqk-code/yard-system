@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Admin Panel</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .pointer { cursor: pointer; }
+  </style>
+</head>
+<body class="bg-light">
+
+<div class="container py-4">
+
+  <h4 class="mb-4">🛠 Admin Panel</h4>
+
+  <div class="mb-3">
+    <label>Select Attendant:</label>
+    <select id="attendantSelect" class="form-select"></select>
+  </div>
+
+  <div class="mb-3">
+    <label>Select Date:</label>
+    <input type="date" id="selectedDate" class="form-control" value="">
+  </div>
+
+  <!-- Purchases Card -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      🛒 Purchases
+      <button class="btn btn-sm btn-outline-primary" id="refreshPurchases">Refresh</button>
+    </div>
+    <div class="card-body">
+
+      <!-- Add New Purchase Form -->
+      <div class="mb-3 border p-2 rounded bg-light">
+        <h6>Add New Purchase</h6>
+        <div class="row g-2">
+          <div class="col-md-3">
+            <input type="text" id="newItem" class="form-control" placeholder="Item">
+          </div>
+          <div class="col-md-2">
+            <input type="number" id="newWeight" class="form-control" placeholder="Weight (KG)">
+          </div>
+          <div class="col-md-2">
+            <input type="number" id="newPrice" class="form-control" placeholder="Price/KG">
+          </div>
+          <div class="col-md-2">
+            <input type="number" id="newTotal" class="form-control" placeholder="Total">
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-success w-100" id="addPurchaseBtn">Add Purchase</button>
+          </div>
+        </div>
+      </div>
+
+      <table class="table table-striped m-0">
+        <thead class="table-light">
+          <tr>
+            <th>Item</th>
+            <th>Weight (KG)</th>
+            <th>Price/KG (KES)</th>
+            <th>Total (KES)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="purchaseTable">
+          <tr><td colspan="5" class="text-center">Select attendant and date</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Expenses Card -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      💸 Expenses
+      <button class="btn btn-sm btn-outline-primary" id="refreshExpenses">Refresh</button>
+    </div>
+    <div class="card-body">
+
+      <!-- Add New Expense Form -->
+      <div class="mb-3 border p-2 rounded bg-light">
+        <h6>Add New Expense</h6>
+        <div class="row g-2">
+          <div class="col-md-6">
+            <input type="text" id="newDesc" class="form-control" placeholder="Description">
+          </div>
+          <div class="col-md-3">
+            <input type="number" id="newAmount" class="form-control" placeholder="Amount">
+          </div>
+          <div class="col-md-3">
+            <button class="btn btn-success w-100" id="addExpenseBtn">Add Expense</button>
+          </div>
+        </div>
+      </div>
+
+      <table class="table table-striped m-0">
+        <thead class="table-light">
+          <tr>
+            <th>Description</th>
+            <th>Amount (KES)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="expenseTable">
+          <tr><td colspan="3" class="text-center">Select attendant and date</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Cash Summary -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header">💰 Cash Summary</div>
+    <div class="card-body">
+      <p>Opening Cash: KES <strong><span id="openingCash">0.00</span></strong></p>
+      <p>Total Top-Ups: KES <strong><span id="totalTopUps">0.00</span></strong></p>
+      <hr>
+      <p class="fw-bold text-success">Closing Cash: KES <span id="closingCash">0.00</span></p>
+      <div class="mb-3">
+        <label>Physical Cash Count (KES)</label>
+        <input type="number" id="physicalCash" class="form-control">
+      </div>
+      <p>Variance: KES <strong><span id="variance">0.00</span></strong></p>
+      <button class="btn btn-warning w-100 mt-2" id="saveCashBtn">Save Changes</button>
+    </div>
+  </div>
+
+  <button class="btn btn-danger w-100 mb-3" id="logoutBtn">Logout</button>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { getFirestore, collection, getDocs, doc, getDoc, setDoc, updateDoc, arrayUnion, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCquNEhCHVkSKDcyOqcczE4eSY3lkrAgOk",
+  authDomain: "yard-management-system-8e53a.firebaseapp.com",
+  projectId: "yard-management-system-8e53a",
+  storageBucket: "yard-management-system-8e53a.appspot.com",
+  messagingSenderId: "268321054164",
+  appId: "1:268321054164:web:b3188cc5080ad6f4ec8a41"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const attendantSelect = document.getElementById("attendantSelect");
+const selectedDate = document.getElementById("selectedDate");
+
+const purchaseTable = document.getElementById("purchaseTable");
+const expenseTable = document.getElementById("expenseTable");
+
+const openingCashEl = document.getElementById("openingCash");
+const totalTopUpsEl = document.getElementById("totalTopUps");
+const closingCashEl = document.getElementById("closingCash");
+const physicalCashInput = document.getElementById("physicalCash");
+const varianceEl = document.getElementById("variance");
+const saveCashBtn = document.getElementById("saveCashBtn");
+const logoutBtn = document.getElementById("logoutBtn");
+
+const newItem = document.getElementById("newItem");
+const newWeight = document.getElementById("newWeight");
+const newPrice = document.getElementById("newPrice");
+const newTotal = document.getElementById("newTotal");
+const addPurchaseBtn = document.getElementById("addPurchaseBtn");
+
+const newDesc = document.getElementById("newDesc");
+const newAmount = document.getElementById("newAmount");
+const addExpenseBtn = document.getElementById("addExpenseBtn");
+
+selectedDate.value = new Date().toISOString().split("T")[0];
+
+function formatKES(n) { return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+async function loadAttendants() {
+  const usersSnap = await getDocs(collection(db,"users"));
+  attendantSelect.innerHTML = `<option value="">--Select Attendant--</option>`;
+  usersSnap.forEach(u=>{
+    const data=u.data();
+    if(data.role!=="admin") attendantSelect.innerHTML += `<option value="${u.id}">${data.fullName||u.id}</option>`;
+  });
+}
+
+async function loadData() {
+  const uid = attendantSelect.value;
+  const date = selectedDate.value;
+  if(!uid) return;
+
+  // Purchases
+  const purchasesSnap = await getDocs(collection(db,"purchases"));
+  const todaysPurchases = purchasesSnap.docs.filter(d => d.data().attendantId===uid && d.data().date===date);
+  purchaseTable.innerHTML = todaysPurchases.length===0
+    ? `<tr><td colspan="5" class="text-center">No purchases today</td></tr>`
+    : todaysPurchases.map(d=>{
+      const p=d.data();
+      return `<tr>
+        <td contenteditable="true" data-field="item" data-id="${d.id}">${p.item||"-"}</td>
+        <td contenteditable="true" data-field="weightKg" data-id="${d.id}">${p.weightKg||0}</td>
+        <td contenteditable="true" data-field="pricePerKg" data-id="${d.id}">${p.pricePerKg||0}</td>
+        <td contenteditable="true" data-field="total" data-id="${d.id}">${p.total||0}</td>
+        <td><button class="btn btn-sm btn-primary savePurchase" data-id="${d.id}">Save</button></td>
+      </tr>`;
+    }).join("");
+
+  // Expenses
+  const expensesSnap = await getDocs(collection(db,"expenses"));
+  const todaysExpenses = expensesSnap.docs.filter(d => d.data().attendantId===uid && d.data().date===date);
+  expenseTable.innerHTML = todaysExpenses.length===0
+    ? `<tr><td colspan="3" class="text-center">No expenses today</td></tr>`
+    : todaysExpenses.map(d=>{
+      const e=d.data();
+      return `<tr>
+        <td contenteditable="true" data-field="description" data-id="${d.id}">${e.description||e.reason||"-"}</td>
+        <td contenteditable="true" data-field="amount" data-id="${d.id}">${e.amount||0}</td>
+        <td><button class="btn btn-sm btn-primary saveExpense" data-id="${d.id}">Save</button></td>
+      </tr>`;
+    }).join("");
+
+  await loadCash(uid,date);
+}
+
+async function loadCash(uid,date) {
+  const ref = doc(db,"cash_sessions",uid+"_"+date);
+  const snap = await getDoc(ref);
+  let openingCash=0, totalTopUps=0, closingCash=0, variance=0, physicalCash=0;
+
+  if(snap.exists()){
+    const data=snap.data();
+    openingCash = data.openingCash||0;
+    const topUps = Array.isArray(data.cashTopUps)?data.cashTopUps:[];
+    totalTopUps = topUps.reduce((sum,t)=>sum+(t.amount||0),0);
+
+    const purchasesSnap = await getDocs(collection(db,"purchases"));
+    const totalPurchases = purchasesSnap.docs.filter(d=>d.data().attendantId===uid && d.data().date===date).reduce((sum,d)=>sum+(d.data().total||0),0);
+    const expensesSnap = await getDocs(collection(db,"expenses"));
+    const totalExpenses = expensesSnap.docs.filter(d=>d.data().attendantId===uid && d.data().date===date).reduce((sum,d)=>sum+(d.data().amount||0),0);
+
+    closingCash = openingCash + totalTopUps - (totalPurchases + totalExpenses);
+    physicalCash = data.physicalCash||0;
+    variance = physicalCash - closingCash;
+  }
+
+  openingCashEl.textContent = formatKES(openingCash);
+  totalTopUpsEl.textContent = formatKES(totalTopUps);
+  closingCashEl.textContent = formatKES(closingCash);
+  physicalCashInput.value = physicalCash;
+  varianceEl.textContent = formatKES(variance);
+
+  physicalCashInput.oninput = ()=>{
+    const physical = Number(physicalCashInput.value||0);
+    varianceEl.textContent = formatKES(physical - closingCash);
+  };
+}
+
+saveCashBtn.onclick = async ()=>{
+  const uid = attendantSelect.value;
+  const date = selectedDate.value;
+  if(!uid) return;
+
+  const ref = doc(db,"cash_sessions",uid+"_"+date);
+  await updateDoc(ref,{
+    physicalCash: Number(physicalCashInput.value||0),
+    variance: Number(physicalCashInput.value||0) - Number(closingCashEl.textContent.replace(/,/g,""))
+  });
+  alert("Cash session updated!");
+};
+
+// Save edited purchases & expenses
+document.addEventListener("click", async e=>{
+  const row = e.target.closest("tr");
+  if(e.target.classList.contains("savePurchase") && row){
+    const id=e.target.dataset.id;
+    const updated={
+      item: row.querySelector("[data-field='item']").textContent,
+      weightKg: Number(row.querySelector("[data-field='weightKg']").textContent),
+      pricePerKg: Number(row.querySelector("[data-field='pricePerKg']").textContent),
+      total: Number(row.querySelector("[data-field='total']").textContent)
+    };
+    await updateDoc(doc(db,"purchases",id),updated);
+    alert("Purchase updated!");
+    loadData();
+  }
+  if(e.target.classList.contains("saveExpense") && row){
+    const id=e.target.dataset.id;
+    const updated={
+      description: row.querySelector("[data-field='description']").textContent,
+      amount: Number(row.querySelector("[data-field='amount']").textContent)
+    };
+    await updateDoc(doc(db,"expenses",id),updated);
+    alert("Expense updated!");
+    loadData();
+  }
+});
+
+// Add new purchase
+addPurchaseBtn.onclick = async ()=>{
+  const uid = attendantSelect.value;
+  const date = selectedDate.value;
+  if(!uid) return;
+  const item = newItem.value.trim();
+  const weight = Number(newWeight.value||0);
+  const price = Number(newPrice.value||0);
+  const total = Number(newTotal.value||0);
+  if(!item || weight<=0 || price<=0 || total<=0){
+    alert("Fill all fields correctly");
+    return;
+  }
+  const ref = doc(collection(db,"purchases"));
+  await setDoc(ref,{
+    attendantId: uid,
+    date: date,
+    item,
+    weightKg: weight,
+    pricePerKg: price,
+    total,
+    createdAt: serverTimestamp()
+  });
+  alert("Purchase added!");
+  newItem.value=""; newWeight.value=""; newPrice.value=""; newTotal.value="";
+  loadData();
+};
+
+// Add new expense
+addExpenseBtn.onclick = async ()=>{
+  const uid = attendantSelect.value;
+  const date = selectedDate.value;
+  if(!uid) return;
+  const desc = newDesc.value.trim();
+  const amount = Number(newAmount.value||0);
+  if(!desc || amount<=0){
+    alert("Fill all fields correctly");
+    return;
+  }
+  const ref = doc(collection(db,"expenses"));
+  await setDoc(ref,{
+    attendantId: uid,
+    date: date,
+    description: desc,
+    amount,
+    createdAt: serverTimestamp()
+  });
+  alert("Expense added!");
+  newDesc.value=""; newAmount.value="";
+  loadData();
+};
+
+document.getElementById("refreshPurchases").onclick = loadData;
+document.getElementById("refreshExpenses").onclick = loadData;
+attendantSelect.onchange = loadData;
+selectedDate.onchange = loadData;
+
+logoutBtn.onclick = ()=>signOut(auth).then(()=>location.href="login.html");
+
+onAuthStateChanged(auth, async user=>{
+  if(!user) location.href="login.html";
+  const snap = await getDoc(doc(db,"users",user.uid));
+  if(!snap.exists() || snap.data().role!=="admin"){
+    alert("Access denied");
+    signOut(auth).then(()=>location.href="login.html");
+    return;
+  }
+  await loadAttendants();
+});
+</script>
+
+</body>
+</html>
+<style>
+/* ===== SYSTEM THEME: BLUE & WHITE ===== */
+
+body {
+  background-color: #f0f4f8;
+  color: #0d1b2a;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+h4, h5, h6 {
+  color: #1e3a8a; /* Dark blue headers */
+}
+
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+}
+
+.card-header {
+  background-color: #1e40af; /* Medium blue */
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.btn {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.btn-success {
+  background-color: #2563eb; /* Blue button instead of green */
+  border-color: #2563eb;
+}
+
+.btn-success:hover {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.btn-outline-primary {
+  color: #1e40af;
+  border-color: #1e40af;
+}
+
+.btn-outline-primary:hover {
+  background-color: #1e40af;
+  color: white;
+}
+
+.btn-outline-danger {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc2626;
+  color: white;
+}
+
+.table thead {
+  background-color: #2563eb;
+  color: white;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(37, 99, 235, 0.1);
+}
+
+input.form-control {
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  padding: 0.5rem;
+}
+
+input.form-control:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+select.form-select {
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  padding: 0.5rem;
+}
+
+select.form-select:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+.card-body p, .card-body label {
+  color: #0d1b2a;
+}
+
+.btn-danger {
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
+.btn-danger:hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+/* Highlight editable cells on hover */
+td[contenteditable="true"]:hover {
+  background-color: rgba(37, 99, 235, 0.1);
+  outline: 1px solid #2563eb;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .row.g-2 > .col-md-*, .col-md-6, .col-md-3 {
+    flex: 100%;
+    max-width: 100%;
+  }
+}
+</style>

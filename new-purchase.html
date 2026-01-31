@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>New Purchase</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<div class="container py-4">
+
+  <div class="card shadow-sm mb-3">
+    <div class="card-body">
+      <h5 class="mb-0">➕ New Purchase</h5>
+      <small class="text-muted">Enter purchase details</small>
+    </div>
+  </div>
+
+  <div class="card shadow">
+    <div class="card-body">
+
+      <div class="mb-3">
+        <label class="form-label">Item Bought</label>
+        <select id="item" class="form-select">
+          <option value="">-- Select Item --</option>
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Weight (KG)</label>
+        <input type="number" id="weight" class="form-control" step="0.01">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Price per KG</label>
+        <input type="number" id="price" class="form-control" step="0.01">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Total Amount</label>
+        <input type="text" id="total" class="form-control" readonly>
+      </div>
+
+      <div class="d-grid gap-2">
+        <button class="btn btn-success" onclick="savePurchase()">
+          💾 Save Purchase
+        </button>
+
+        <a href="dashboard.html" class="btn btn-outline-secondary">
+          ⬅ Back
+        </a>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } 
+  from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { 
+  getFirestore,
+  collection,
+  addDoc,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCquNEhCHVkSKDcyOqcczE4eSY3lkrAgOk",
+  authDomain: "yard-management-system-8e53a.firebaseapp.com",
+  projectId: "yard-management-system-8e53a",
+  storageBucket: "yard-management-system-8e53a.appspot.com",
+  messagingSenderId: "268321054164",
+  appId: "1:268321054164:web:b3188cc5080ad6f4ec8a41"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+let currentUserData = null;
+
+const itemSelect = document.getElementById("item");
+const weightInput = document.getElementById("weight");
+const priceInput = document.getElementById("price");
+const totalInput = document.getElementById("total");
+
+// 🔐 Protect page & load profile
+onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    window.location.replace("login.html");
+    return;
+  }
+
+  const snap = await getDoc(doc(db, "users", user.uid));
+  if (!snap.exists()) {
+    alert("Your account is not fully set up. Contact admin.");
+    return;
+  }
+
+  currentUserData = {
+    uid: user.uid,
+    ...snap.data()
+  };
+});
+
+// 📦 Load items into dropdown
+async function loadItems() {
+  const q = query(collection(db, "items"), where("active", "==", true));
+  const snap = await getDocs(q);
+
+  snap.forEach(docSnap => {
+    const opt = document.createElement("option");
+    opt.value = docSnap.data().name;
+    opt.textContent = docSnap.data().name;
+    itemSelect.appendChild(opt);
+  });
+}
+
+loadItems();
+
+// 🧮 Auto calculate total
+function calculateTotal() {
+  const weight = parseFloat(weightInput.value) || 0;
+  const price = parseFloat(priceInput.value) || 0;
+  const rawTotal = weight * price;
+ 
+  totalInput.value = rawTotal.toLocaleString(undefined,{
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+}
+
+weightInput.addEventListener("input", calculateTotal);
+priceInput.addEventListener("input", calculateTotal);
+
+// 💾 Save purchase
+window.savePurchase = async function () {
+
+  if (!currentUserData) {
+    alert("User profile not loaded yet");
+    return;
+  }
+
+  const item = itemSelect.value;
+  const weight = parseFloat(weightInput.value);
+  const price = parseFloat(priceInput.value);
+  const total = parseFloat(totalInput.value.replace(/,/g, ""));
+
+  if (!item || !weight || !price) {
+    alert("Please fill all fields");
+    return;
+  }
+
+  // ✅ Get today's date
+  const dateToday = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+  await addDoc(collection(db, "purchases"), {
+    item,
+    weightKg: weight,
+    pricePerKg: price,
+    total,
+    date: dateToday,        // <-- added date for today.html
+    attendantId: currentUserData.uid,
+    attendantName: currentUserData.fullName,
+    postName: currentUserData.postName,
+    createdAt: serverTimestamp()
+  });
+
+  alert("Purchase saved successfully");
+  window.location.href = "dashboard.html";
+};
+</script>
+
+</body>
+</html>
+<style>
+/* ===== SYSTEM THEME: BLUE & WHITE ===== */
+
+body {
+  background-color: #f0f4f8;
+  color: #0d1b2a;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+h4, h5, h6 {
+  color: #1e3a8a; /* Dark blue headers */
+}
+
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+}
+
+.card-header {
+  background-color: #1e40af; /* Medium blue */
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.btn {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.btn-success {
+  background-color: #2563eb; /* Blue button instead of green */
+  border-color: #2563eb;
+}
+
+.btn-success:hover {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.btn-outline-primary {
+  color: #1e40af;
+  border-color: #1e40af;
+}
+
+.btn-outline-primary:hover {
+  background-color: #1e40af;
+  color: white;
+}
+
+.btn-outline-danger {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc2626;
+  color: white;
+}
+
+.table thead {
+  background-color: #2563eb;
+  color: white;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(37, 99, 235, 0.1);
+}
+
+input.form-control {
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  padding: 0.5rem;
+}
+
+input.form-control:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+select.form-select {
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  padding: 0.5rem;
+}
+
+select.form-select:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+.card-body p, .card-body label {
+  color: #0d1b2a;
+}
+
+.btn-danger {
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
+.btn-danger:hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+/* Highlight editable cells on hover */
+td[contenteditable="true"]:hover {
+  background-color: rgba(37, 99, 235, 0.1);
+  outline: 1px solid #2563eb;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .row.g-2 > .col-md-*, .col-md-6, .col-md-3 {
+    flex: 100%;
+    max-width: 100%;
+  }
+}
+</style>

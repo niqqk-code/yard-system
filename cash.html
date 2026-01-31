@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Cash Control</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light">
+
+<div class="container py-4">
+
+<h5 class="mb-3">💰 Cash Control</h5>
+
+<div class="card">
+<div class="card-body">
+
+<div class="mb-3">
+<label>Opening Cash (KES)</label>
+<input type="number" id="openingCash" class="form-control" readonly>
+</div>
+
+<div class="mb-3">
+<label>Top Up Cash (KES)</label>
+<input type="number" id="topUpCash" class="form-control">
+</div>
+
+<button class="btn btn-success w-100" id="saveBtn">Save Top-Up</button>
+<a href="dashboard.html" class="btn btn-secondary w-100 mt-2">Back</a>
+
+</div>
+</div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  setDoc,
+  updateDoc,
+  arrayUnion,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCquNEhCHVkSKDcyOqcczE4eSY3lkrAgOk",
+  authDomain: "yard-management-system-8e53a.firebaseapp.com",
+  projectId: "yard-management-system-8e53a",
+  storageBucket: "yard-management-system-8e53a.appspot.com",
+  messagingSenderId: "268321054164",
+  appId: "1:268321054164:web:b3188cc5080ad6f4ec8a41"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const openingCashInput = document.getElementById("openingCash");
+const topUpCashInput = document.getElementById("topUpCash");
+const saveBtn = document.getElementById("saveBtn");
+
+// Get today's date string
+function today() {
+  return new Date().toISOString().split("T")[0];
+}
+
+// ✅ Function to check if the day is closed
+async function isDayClosed(uid) {
+  const ref = doc(db, "cash_sessions", uid + "_" + today());
+  const snap = await getDoc(ref);
+  return snap.exists() && snap.data().closed === true;
+}
+
+// Load opening cash
+async function loadOpeningCash(user) {
+  const todayRef = doc(db, "cash_sessions", user.uid + "_" + today());
+  const todaySnap = await getDoc(todayRef);
+
+  if (todaySnap.exists()) {
+    const data = todaySnap.data();
+    openingCashInput.value = data.openingCash || 0;
+
+    if (data.closed === true) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = "🔒 Day Closed";
+    }
+    return;
+  }
+
+  // Load yesterday closing cash if today doesn't exist
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yString = yesterday.toISOString().split("T")[0];
+  const yRef = doc(db, "cash_sessions", user.uid + "_" + yString);
+  const ySnap = await getDoc(yRef);
+
+  openingCashInput.value = ySnap.exists()
+    ? ySnap.data().closingCash || 0
+    : 0;
+}
+
+// Auth listener
+onAuthStateChanged(auth, async user => {
+  if (!user) location.href = "login.html";
+
+  // ✅ Check if day is closed before anything else
+  if (await isDayClosed(user.uid)) {
+    alert("Day is closed. No more entries allowed.");
+    saveBtn.disabled = true;
+    saveBtn.textContent = "🔒 Day Closed";
+  }
+
+  await loadOpeningCash(user);
+});
+
+// Save top-up
+saveBtn.onclick = async () => {
+  const user = auth.currentUser;
+  if (!user) return;
+
+  const topUp = Number(topUpCashInput.value || 0);
+  if (topUp <= 0) {
+    alert("Enter a valid top-up amount");
+    return;
+  }
+
+  const ref = doc(db, "cash_sessions", user.uid + "_" + today());
+  const snap = await getDoc(ref);
+
+  if (!snap.exists()) {
+    await setDoc(ref, {
+      attendantId: user.uid,
+      openingCash: Number(openingCashInput.value),
+      cashTopUps: [],
+      date: today(),
+      createdAt: serverTimestamp(),
+      closed: false
+    });
+  }
+
+  await updateDoc(ref, {
+    cashTopUps: arrayUnion({
+      amount: topUp,
+      timestamp: new Date()
+    })
+  });
+
+  alert("Top-up saved");
+  topUpCashInput.value = "";
+};
+</script>
+
+</body>
+</html>
+<style>
+/* ===== SYSTEM THEME: BLUE & WHITE ===== */
+
+body {
+  background-color: #f0f4f8;
+  color: #0d1b2a;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+h4, h5, h6 {
+  color: #1e3a8a; /* Dark blue headers */
+}
+
+.card {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+}
+
+.card-header {
+  background-color: #1e40af; /* Medium blue */
+  color: white;
+  font-weight: 600;
+  font-size: 1rem;
+}
+
+.btn {
+  border-radius: 8px;
+  font-weight: 500;
+}
+
+.btn-success {
+  background-color: #2563eb; /* Blue button instead of green */
+  border-color: #2563eb;
+}
+
+.btn-success:hover {
+  background-color: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.btn-outline-primary {
+  color: #1e40af;
+  border-color: #1e40af;
+}
+
+.btn-outline-primary:hover {
+  background-color: #1e40af;
+  color: white;
+}
+
+.btn-outline-danger {
+  color: #dc2626;
+  border-color: #dc2626;
+}
+
+.btn-outline-danger:hover {
+  background-color: #dc2626;
+  color: white;
+}
+
+.table thead {
+  background-color: #2563eb;
+  color: white;
+}
+
+.table-striped tbody tr:nth-of-type(odd) {
+  background-color: rgba(37, 99, 235, 0.1);
+}
+
+input.form-control {
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  padding: 0.5rem;
+}
+
+input.form-control:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+select.form-select {
+  border-radius: 8px;
+  border: 1px solid #93c5fd;
+  padding: 0.5rem;
+}
+
+select.form-select:focus {
+  border-color: #1d4ed8;
+  box-shadow: 0 0 5px rgba(37, 99, 235, 0.3);
+}
+
+.card-body p, .card-body label {
+  color: #0d1b2a;
+}
+
+.btn-danger {
+  background-color: #ef4444;
+  border-color: #ef4444;
+}
+
+.btn-danger:hover {
+  background-color: #dc2626;
+  border-color: #dc2626;
+}
+
+/* Highlight editable cells on hover */
+td[contenteditable="true"]:hover {
+  background-color: rgba(37, 99, 235, 0.1);
+  outline: 1px solid #2563eb;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .row.g-2 > .col-md-*, .col-md-6, .col-md-3 {
+    flex: 100%;
+    max-width: 100%;
+  }
+}
+</style>
