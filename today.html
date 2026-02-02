@@ -14,14 +14,17 @@
 
   <!-- Purchases -->
   <div class="card mb-4 shadow-sm">
-    <div class="card-header">🛒 Purchases</div>
+    <div class="card-header">
+      🛒 Purchases
+      <small class="text-muted ms-2">(Last entered item appears first)</small>
+    </div>
     <div class="card-body p-0">
       <table class="table table-striped m-0">
         <thead class="table-light">
           <tr>
             <th>Item</th>
-            <th>Weight (KG)</th>
-            <th>Price/KG (KES)</th>
+            <th>Total Weight (KG)</th>
+            <th>Avg Price/KG (KES)</th>
             <th>Total (KES)</th>
           </tr>
         </thead>
@@ -35,6 +38,19 @@
           </tr>
         </tfoot>
       </table>
+    </div>
+  </div>
+
+  <!-- STOCK SUMMARY -->
+  <div class="card mb-4 shadow-sm">
+    <div class="card-header">📦 Stock Summary (Today)</div>
+    <div class="card-body">
+      <ul class="list-group" id="stockSummary">
+        <li class="list-group-item text-center text-muted">Loading stock...</li>
+      </ul>
+      <small class="text-muted d-block mt-2">
+        Default threshold: <strong>1000 KG</strong>
+      </small>
     </div>
   </div>
 
@@ -85,13 +101,8 @@
 </div>
 
 <script type="module">
-import {
-  initializeApp
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import {
-  getAuth,
-  onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
   getFirestore,
   collection,
@@ -102,21 +113,19 @@ import {
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-const firebaseConfig = {
+const app = initializeApp({
   apiKey: "AIzaSyCquNEhCHVkSKDcyOqcczE4eSY3lkrAgOk",
   authDomain: "yard-management-system-8e53a.firebaseapp.com",
-  projectId: "yard-management-system-8e53a",
-  storageBucket: "yard-management-system-8e53a.appspot.com",
-  messagingSenderId: "268321054164",
-  appId: "1:268321054164:web:b3188cc5080ad6f4ec8a41"
-};
+  projectId: "yard-management-system-8e53a"
+});
 
-const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
 
 const purchaseTable = document.getElementById("purchaseTable");
+const stockSummary = document.getElementById("stockSummary");
 const expenseTable = document.getElementById("expenseTable");
+
 const totalPurchasesEl = document.getElementById("totalPurchases");
 const totalExpensesEl = document.getElementById("totalExpenses");
 const openingCashEl = document.getElementById("openingCash");
@@ -126,113 +135,133 @@ const physicalCashInput = document.getElementById("physicalCash");
 const varianceEl = document.getElementById("variance");
 const closeBtn = document.getElementById("closeDayBtn");
 
-function todayString() {
-  return new Date().toISOString().split("T")[0];
+const today = new Date().toISOString().split("T")[0];
+const STOCK_THRESHOLD = 1000;
+
+function formatKES(n){
+  return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2});
 }
 
-function formatKES(n) {
-  return Number(n || 0).toLocaleString(undefined, { minimumFractionDigits:2, maximumFractionDigits:2 });
+function tsToMs(ts){
+  return ts?.seconds ? ts.seconds*1000 : 0;
 }
 
-function isToday(ts) {
-  if(!ts) return false;
-  const d = ts.seconds ? new Date(ts.seconds * 1000) : new Date(ts);
-  return d.toISOString().split("T")[0] === todayString();
-}
+onAuthStateChanged(auth, async user=>{
+  if(!user) location.href="login.html";
+  const uid=user.uid;
 
-// Load data
-onAuthStateChanged(auth, async (user) => {
-  if (!user) location.href = "login.html";
+  /* CASH */
+  let openingCash=0, totalTopUps=0;
+  const cashSnap=await getDoc(doc(db,"cash_sessions",uid+"_"+today));
+  if(cashSnap.exists()){
+    openingCash=cashSnap.data().openingCash||0;
+    totalTopUps=(cashSnap.data().cashTopUps||[])
+      .reduce((s,t)=>s+(t.amount||0),0);
+  }
+  openingCashEl.textContent=formatKES(openingCash);
+  totalTopUpsEl.textContent=formatKES(totalTopUps);
 
-  const uid = user.uid;
-  const today = todayString();
+  /* PURCHASES + STOCK */
+  const snap=await getDocs(collection(db,"purchases"));
+  const todays=snap.docs.filter(d=>d.data().attendantId===uid && d.data().date===today);
 
-  let openingCash = 0, totalTopUps = 0;
+  const map={};
+  let totalPurchases=0;
 
-  const cashSnap = await getDoc(doc(db, "cash_sessions", uid + "_" + today));
-  if (cashSnap.exists()) {
-    openingCash = cashSnap.data().openingCash || 0;
-    const topUps = Array.isArray(cashSnap.data().cashTopUps) ? cashSnap.data().cashTopUps : [];
-    totalTopUps = topUps.reduce((sum,t)=>sum+(t.amount||0),0);
+  todays.forEach(d=>{
+    const p=d.data();
+    const item=p.item||"Unknown";
+    if(!map[item]) map[item]={weight:0,total:0,last:0};
+    map[item].weight+=Number(p.weightKg||0);
+    map[item].total+=Number(p.total||0);
+    map[item].last=Math.max(map[item].last,tsToMs(p.createdAt));
+  });
+
+  purchaseTable.innerHTML="";
+  stockSummary.innerHTML="";
+
+  if(!todays.length){
+    purchaseTable.innerHTML=`<tr><td colspan="4" class="text-center">No purchases today</td></tr>`;
+    stockSummary.innerHTML=`<li class="list-group-item text-center text-muted">No stock yet</li>`;
+  } else {
+    Object.entries(map)
+      .sort((a,b)=>b[1].last-a[1].last)
+      .forEach(([item,v])=>{
+        const avg=v.weight>0?v.total/v.weight:0;
+        totalPurchases+=v.total;
+
+        purchaseTable.innerHTML+=`
+          <tr>
+            <td><strong>${item}</strong></td>
+            <td>${v.weight.toFixed(2)}</td>
+            <td>${formatKES(avg)}</td>
+            <td>${formatKES(v.total)}</td>
+          </tr>`;
+
+        const ready=v.weight>=STOCK_THRESHOLD;
+        stockSummary.innerHTML+=`
+          <li class="list-group-item d-flex justify-content-between align-items-center ${ready?'list-group-item-success':''}">
+            <span><strong>${item}</strong></span>
+            <span>
+              ${v.weight.toFixed(2)} KG
+              ${ready?'<span class="badge bg-success ms-2">READY FOR SALE</span>':''}
+            </span>
+          </li>`;
+      });
   }
 
-  openingCashEl.textContent = formatKES(openingCash);
-  totalTopUpsEl.textContent = formatKES(totalTopUps);
+  totalPurchasesEl.textContent=formatKES(totalPurchases);
 
-  // Purchases
-  let totalPurchases = 0;
-  purchaseTable.innerHTML = "";
-  const purchasesSnap = await getDocs(collection(db, "purchases"));
-  const todaysPurchases = purchasesSnap.docs.filter(d => d.data().attendantId === uid && (d.data().date===today || isToday(d.data().createdAt)));
-  if(todaysPurchases.length===0){
-    purchaseTable.innerHTML = `<tr><td colspan="4" class="text-center">No purchases today</td></tr>`;
-  } else {
-    todaysPurchases.forEach(d=>{
-      const p=d.data();
-      totalPurchases += Number(p.total||0);
-      purchaseTable.innerHTML += `<tr>
-        <td>${p.item||"-"}</td>
-        <td>${p.weightKg||0}</td>
-        <td>${formatKES(p.pricePerKg)}</td>
-        <td>${formatKES(p.total)}</td>
-      </tr>`;
-    });
-  }
-  totalPurchasesEl.textContent = formatKES(totalPurchases);
-
-  // Expenses
-  let totalExpenses = 0;
-  expenseTable.innerHTML = "";
-  const expensesSnap = await getDocs(collection(db, "expenses"));
-  const todaysExpenses = expensesSnap.docs.filter(d => d.data().attendantId === uid && (d.data().date===today || isToday(d.data().createdAt)));
-  if(todaysExpenses.length===0){
-    expenseTable.innerHTML = `<tr><td colspan="2" class="text-center">No expenses today</td></tr>`;
-  } else {
-    todaysExpenses.forEach(d=>{
+  /* EXPENSES */
+  let totalExpenses=0;
+  expenseTable.innerHTML="";
+  const expSnap=await getDocs(collection(db,"expenses"));
+  expSnap.docs.filter(d=>d.data().attendantId===uid && d.data().date===today)
+    .forEach(d=>{
       const e=d.data();
-      totalExpenses += Number(e.amount||0);
-      expenseTable.innerHTML += `<tr>
-        <td>${e.description||e.reason||"-"}</td>
-        <td>${formatKES(e.amount)}</td>
-      </tr>`;
+      totalExpenses+=Number(e.amount||0);
+      expenseTable.innerHTML+=`
+        <tr>
+          <td>${e.description||"-"}</td>
+          <td>${formatKES(e.amount)}</td>
+        </tr>`;
     });
+
+  if(!expenseTable.innerHTML){
+    expenseTable.innerHTML=`<tr><td colspan="2" class="text-center">No expenses today</td></tr>`;
   }
-  totalExpensesEl.textContent = formatKES(totalExpenses);
 
-  // Closing cash & total spend
-  const totalSpend = totalPurchases + totalExpenses;
-  const closingCash = openingCash + totalTopUps - totalSpend;
-  closingCashEl.textContent = formatKES(closingCash);
+  totalExpensesEl.textContent=formatKES(totalExpenses);
 
-  // Variance calculation
-  function updateVariance() {
-    const physical = Number(physicalCashInput.value||0);
-    varianceEl.textContent = formatKES(physical - closingCash);
-  }
-  physicalCashInput.addEventListener("input", updateVariance);
+  const closingCash=openingCash+totalTopUps-(totalPurchases+totalExpenses);
+  closingCashEl.textContent=formatKES(closingCash);
 
-  // Close Day button
-  closeBtn.onclick = async () => {
-    if (!confirm("Are you sure you want to close the day? This cannot be undone.")) return;
+  physicalCashInput.oninput=()=>{
+    varianceEl.textContent=formatKES((physicalCashInput.value||0)-closingCash);
+  };
 
-    const cashRef = doc(db, "cash_sessions", uid + "_" + today);
-    await updateDoc(cashRef,{
-      closingCash: closingCash,
-      totalPurchases: totalPurchases,
-      totalExpenses: totalExpenses,
-      physicalCash: Number(physicalCashInput.value||0),
-      variance: Number(physicalCashInput.value||0) - closingCash,
-      closed: true,
-      closedAt: serverTimestamp()
+  closeBtn.onclick=async()=>{
+    if(!confirm("Close the day?")) return;
+    await updateDoc(doc(db,"cash_sessions",uid+"_"+today),{
+      closingCash,
+      totalPurchases,
+      totalExpenses,
+      physicalCash:Number(physicalCashInput.value||0),
+      variance:Number(physicalCashInput.value||0)-closingCash,
+      closed:true,
+      closedAt:serverTimestamp()
     });
     alert("Day closed successfully");
-    closeBtn.disabled = true;
+    closeBtn.disabled=true;
   };
 });
 </script>
 
 </body>
 </html>
+
+
+
 <style>
 /* ===== SYSTEM THEME: BLUE & WHITE ===== */
 
