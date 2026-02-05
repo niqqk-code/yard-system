@@ -10,94 +10,147 @@
 <body class="bg-light">
 
 <div class="container py-4">
-  <h5 class="mb-3">📅 Today's Summary</h5>
+<h5 class="mb-3">📅 Today's Summary</h5>
 
-  <!-- Purchases -->
-  <div class="card mb-4 shadow-sm">
-    <div class="card-header">
-      🛒 Purchases
-      <small class="text-muted ms-2">(Last entered item appears first)</small>
-    </div>
-    <div class="card-body p-0">
-      <table class="table table-striped m-0">
-        <thead class="table-light">
-          <tr>
-            <th>Item</th>
-            <th>Total Weight (KG)</th>
-            <th>Avg Price/KG (KES)</th>
-            <th>Total (KES)</th>
-          </tr>
-        </thead>
-        <tbody id="purchaseTable">
-          <tr><td colspan="4" class="text-center">Loading...</td></tr>
-        </tbody>
-        <tfoot class="table-light">
-          <tr>
-            <th colspan="3">Total Purchases</th>
-            <th id="totalPurchases">0.00</th>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  </div>
+<!-- ================= YARD PURCHASES ================= -->
+<div class="card mb-4 shadow-sm">
+<div class="card-header">🛒 Yard Purchases</div>
+<div class="card-body p-0">
+<table class="table table-striped m-0">
+<thead class="table-light">
+<tr>
+<th>Item</th>
+<th>Total Weight (KG)</th>
+<th>Avg Price/KG</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody id="purchaseTable"></tbody>
+<tfoot class="table-light">
+<tr>
+<th colspan="3">Total Yard Purchases</th>
+<th id="totalPurchases">0.00</th>
+</tr>
+</tfoot>
+</table>
+</div>
+</div>
 
-  <!-- STOCK SUMMARY -->
-  <div class="card mb-4 shadow-sm">
-    <div class="card-header">📦 Stock Summary (Today)</div>
-    <div class="card-body">
-      <ul class="list-group" id="stockSummary">
-        <li class="list-group-item text-center text-muted">Loading stock...</li>
-      </ul>
-      <small class="text-muted d-block mt-2">
-        Default threshold: <strong>1000 KG</strong>
-      </small>
-    </div>
-  </div>
+<!-- ================= BROKER PURCHASES ================= -->
+<div class="card mb-4 shadow-sm">
+<div class="card-header">🤝 Broker Purchases</div>
+<div class="card-body p-0">
+<table class="table table-striped m-0">
+<thead class="table-light">
+<tr>
+<th>Broker</th>
+<th>Item</th>
+<th>Paid By</th>
+<th>Weight</th>
+<th>Avg Price/KG</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody id="brokerTable"></tbody>
+<tfoot class="table-light">
+<tr>
+<th colspan="5">Total Broker Purchases</th>
+<th id="totalBrokerPurchases">0.00</th>
+</tr>
+</tfoot>
+</table>
+</div>
+</div>
 
-  <!-- Expenses -->
-  <div class="card mb-4 shadow-sm">
-    <div class="card-header">💸 Expenses</div>
-    <div class="card-body p-0">
-      <table class="table table-striped m-0">
-        <thead class="table-light">
-          <tr>
-            <th>Description</th>
-            <th>Amount (KES)</th>
-          </tr>
-        </thead>
-        <tbody id="expenseTable">
-          <tr><td colspan="2" class="text-center">Loading...</td></tr>
-        </tbody>
-        <tfoot class="table-light">
-          <tr>
-            <th>Total Expenses</th>
-            <th id="totalExpenses">0.00</th>
-          </tr>
-        </tfoot>
-      </table>
-    </div>
-  </div>
+<!-- ================= WALK-IN SALES ================= -->
+<div class="card mb-4 shadow-sm">
+<div class="card-header">🧍 Walk-In Sales</div>
+<div class="card-body p-0">
+<table class="table table-striped m-0">
+<thead class="table-light">
+<tr>
+<th>Item</th>
+<th>Weight</th>
+<th>Price/KG</th>
+<th>Total</th>
+</tr>
+</thead>
+<tbody id="walkinTable"></tbody>
+<tfoot class="table-light">
+<tr>
+<th colspan="3">Total Walk-In Sales</th>
+<th id="totalWalkinSales">0.00</th>
+</tr>
+</tfoot>
+</table>
+</div>
+</div>
 
-  <!-- Cash Summary -->
-  <div class="card mb-4 shadow-sm">
-    <div class="card-header">💰 Cash Summary</div>
-    <div class="card-body">
-      <p>Opening Cash: KES <strong><span id="openingCash">0.00</span></strong></p>
-      <p>Total Top-Ups: KES <strong><span id="totalTopUps">0.00</span></strong></p>
-      <hr>
-      <p class="fw-bold text-success">
-        Closing Cash: KES <span id="closingCash">0.00</span>
-      </p>
-      <div class="mb-3">
-        <label>Physical Cash Count (KES)</label>
-        <input type="number" id="physicalCash" class="form-control" placeholder="Enter physical cash">
-      </div>
-      <p>Variance: KES <strong><span id="variance">0.00</span></strong></p>
-    </div>
-  </div>
+<!-- ================= STOCK SUMMARY ================= -->
+<div class="card mb-4 shadow-sm">
+<div class="card-header">📦 Stock Summary</div>
+<div class="card-body">
+<ul class="list-group" id="stockSummary"></ul>
+<small class="text-muted">Threshold: 1000 KG</small>
+</div>
+</div>
 
-  <button class="btn btn-danger w-100 mb-3" id="closeDayBtn">🔒 Close Day & Submit Cash</button>
-  <a href="dashboard.html" class="btn btn-secondary w-100">⬅ Back to Dashboard</a>
+<!-- ================= EXPENSES ================= -->
+<div class="card mb-4 shadow-sm">
+<div class="card-header">💸 Expenses</div>
+<div class="card-body p-0">
+<table class="table table-striped m-0">
+<thead class="table-light">
+<tr>
+<th>Description</th>
+<th>Amount</th>
+</tr>
+</thead>
+<tbody id="expenseTable"></tbody>
+<tfoot class="table-light">
+<tr>
+<th>Total Expenses</th>
+<th id="totalExpenses">0.00</th>
+</tr>
+</tfoot>
+</table>
+</div>
+</div>
+
+<!-- ================= CASH SUMMARY ================= -->
+<div class="card mb-4 shadow-sm">
+<div class="card-header">💰 Cash Summary</div>
+<div class="card-body">
+
+<p>Opening Cash: <strong>KES <span id="openingCash">0.00</span></strong></p>
+
+<p>Total Top-Ups: <strong>KES <span id="totalTopUps">0.00</span></strong></p>
+<ul id="topUpList" class="small text-muted"></ul>
+
+<hr>
+
+<p>Yard Purchases: <strong>KES <span id="yardSpend">0.00</span></strong></p>
+<p>Expenses: <strong>KES <span id="expenseSpend">0.00</span></strong></p>
+<p>Broker (Attendant Paid): <strong>KES <span id="brokerSpend">0.00</span></strong></p>
+
+<hr>
+
+<p class="fw-bold">Total Spend: KES <span id="totalSpend">0.00</span></p>
+<p class="fw-bold text-success">Closing Cash: KES <span id="closingCash">0.00</span></p>
+
+<div class="mb-3">
+<label>Physical Cash Count</label>
+<input type="number" id="physicalCash" class="form-control">
+</div>
+
+<p>Variance: <strong>KES <span id="variance">0.00</span></strong></p>
+
+</div>
+</div>
+
+<button class="btn btn-danger w-100 mb-3" id="closeDayBtn">🔒 Close Day</button>
+<a href="dashboard.html" class="btn btn-secondary w-100">⬅ Back</a>
+
 </div>
 
 <script type="module">
@@ -109,151 +162,174 @@ import {
   getDocs,
   doc,
   getDoc,
+  setDoc,
   updateDoc,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
+const el = id => document.getElementById(id);
+const f = n => Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2});
+
 const app = initializeApp({
-  apiKey: "AIzaSyCquNEhCHVkSKDcyOqcczE4eSY3lkrAgOk",
-  authDomain: "yard-management-system-8e53a.firebaseapp.com",
-  projectId: "yard-management-system-8e53a"
+  apiKey:"AIzaSyCquNEhCHVkSKDcyOqcczE4eSY3lkrAgOk",
+  authDomain:"yard-management-system-8e53a.firebaseapp.com",
+  projectId:"yard-management-system-8e53a"
 });
 
-const auth = getAuth(app);
 const db = getFirestore(app);
-
-const purchaseTable = document.getElementById("purchaseTable");
-const stockSummary = document.getElementById("stockSummary");
-const expenseTable = document.getElementById("expenseTable");
-
-const totalPurchasesEl = document.getElementById("totalPurchases");
-const totalExpensesEl = document.getElementById("totalExpenses");
-const openingCashEl = document.getElementById("openingCash");
-const totalTopUpsEl = document.getElementById("totalTopUps");
-const closingCashEl = document.getElementById("closingCash");
-const physicalCashInput = document.getElementById("physicalCash");
-const varianceEl = document.getElementById("variance");
-const closeBtn = document.getElementById("closeDayBtn");
-
+const auth = getAuth(app);
 const today = new Date().toISOString().split("T")[0];
+const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 const STOCK_THRESHOLD = 1000;
 
-function formatKES(n){
-  return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2});
-}
-
-function tsToMs(ts){
-  return ts?.seconds ? ts.seconds*1000 : 0;
-}
-
 onAuthStateChanged(auth, async user=>{
-  if(!user) location.href="login.html";
-  const uid=user.uid;
+if(!user) return location.href="login.html";
+const uid=user.uid;
 
-  /* CASH */
-  let openingCash=0, totalTopUps=0;
-  const cashSnap=await getDoc(doc(db,"cash_sessions",uid+"_"+today));
-  if(cashSnap.exists()){
-    openingCash=cashSnap.data().openingCash||0;
-    totalTopUps=(cashSnap.data().cashTopUps||[])
-      .reduce((s,t)=>s+(t.amount||0),0);
-  }
-  openingCashEl.textContent=formatKES(openingCash);
-  totalTopUpsEl.textContent=formatKES(totalTopUps);
+/* ===== CASH SESSION ===== */
+let openingCash=0, topUps=[];
+const cashRef = doc(db,"cash_sessions",uid+"_"+today);
+const cashSnap=await getDoc(cashRef);
 
-  /* PURCHASES + STOCK */
-  const snap=await getDocs(collection(db,"purchases"));
-  const todays=snap.docs.filter(d=>d.data().attendantId===uid && d.data().date===today);
+if(cashSnap.exists()){
+  openingCash=cashSnap.data().openingCash||0;
+  topUps=cashSnap.data().cashTopUps||[];
+}
 
-  const map={};
-  let totalPurchases=0;
+el("openingCash").textContent=f(openingCash);
+const topUpTotal = topUps.reduce((s,t)=>s+Number(t.amount||0),0);
+el("totalTopUps").textContent=f(topUpTotal);
+el("topUpList").innerHTML=topUps.map(t=>`<li>KES ${f(t.amount)}</li>`).join("");
 
-  todays.forEach(d=>{
-    const p=d.data();
-    const item=p.item||"Unknown";
-    if(!map[item]) map[item]={weight:0,total:0,last:0};
-    map[item].weight+=Number(p.weightKg||0);
-    map[item].total+=Number(p.total||0);
-    map[item].last=Math.max(map[item].last,tsToMs(p.createdAt));
+/* ===== STOCK ===== */
+const stock={};
+const add=(i,w)=>stock[i]=(stock[i]||0)+w;
+const sub=(i,w)=>stock[i]=(stock[i]||0)-w;
+
+/* ===== YARD ===== */
+let yardTotal=0;
+const yardSnap=await getDocs(collection(db,"purchases"));
+yardSnap.forEach(d=>{
+  const p=d.data();
+  if(p.attendantId!==uid||p.date!==today) return;
+  yardTotal+=Number(p.total||0);
+  add(p.item,Number(p.weightKg||0));
+  el("purchaseTable").innerHTML+=`
+  <tr>
+    <td>${p.item}</td>
+    <td>${p.weightKg}</td>
+    <td>${f((p.total||0)/(p.weightKg||1))}</td>
+    <td>${f(p.total)}</td>
+  </tr>`;
+});
+el("yardSpend").textContent=f(yardTotal);
+el("totalPurchases").textContent=f(yardTotal);
+
+/* ===== BROKER ===== */
+let brokerCash=0, brokerTotal=0;
+const brokerSnap=await getDocs(collection(db,"broker_purchases"));
+brokerSnap.forEach(d=>{
+  const b=d.data();
+  if(b.attendantId!==uid||b.date!==today) return;
+  brokerTotal+=Number(b.total||0);
+  add(b.item,Number(b.weightKg||0));
+  if(b.paidBy==="attendant") brokerCash+=Number(b.total||0);
+
+  el("brokerTable").innerHTML+=`
+  <tr>
+    <td>${b.brokerName||"-"}</td>
+    <td>${b.item}</td>
+    <td>${b.paidBy==="attendant"?"Attendant":"Yard Owner"}</td>
+    <td>${b.weightKg}</td>
+    <td>${f((b.total||0)/(b.weightKg||1))}</td>
+    <td>${f(b.total)}</td>
+  </tr>`;
+});
+el("brokerSpend").textContent=f(brokerCash);
+el("totalBrokerPurchases").textContent=f(brokerTotal);
+
+/* ===== WALK-IN ===== */
+let walkTotal=0;
+const walkSnap=await getDocs(collection(db,"walkin_sales"));
+walkSnap.forEach(d=>{
+  const s=d.data();
+  if(s.attendantId!==uid||s.date!==today) return;
+  walkTotal+=Number(s.total||0);
+  sub(s.item,Number(s.weightKg||0));
+  const priceKg = s.pricePerKg ?? s.priceKg ?? 0;
+  el("walkinTable").innerHTML+=`
+  <tr>
+    <td>${s.item}</td>
+    <td>${s.weightKg}</td>
+    <td>${f(priceKg)}</td>
+    <td>${f(s.total)}</td>
+  </tr>`;
+});
+el("totalWalkinSales").textContent=f(walkTotal);
+
+/* ===== EXPENSES ===== */
+let expTotal=0;
+const expSnap=await getDocs(collection(db,"expenses"));
+expSnap.forEach(d=>{
+  const e=d.data();
+  if(e.attendantId!==uid||e.date!==today) return;
+  expTotal+=Number(e.amount||0);
+  el("expenseTable").innerHTML+=`
+  <tr><td>${e.description}</td><td>${f(e.amount)}</td></tr>`;
+});
+el("expenseSpend").textContent=f(expTotal);
+el("totalExpenses").textContent=f(expTotal);
+
+/* ===== STOCK UI ===== */
+el("stockSummary").innerHTML=Object.entries(stock).map(([i,w])=>
+`<li class="list-group-item d-flex justify-content-between ${w>=STOCK_THRESHOLD?'list-group-item-success':''}">
+<strong>${i}</strong><span>${w.toFixed(2)} KG</span></li>`).join("");
+
+/* ===== FINAL CASH ===== */
+const totalSpend = yardTotal + expTotal + brokerCash;
+el("totalSpend").textContent=f(totalSpend);
+
+const closingCash = openingCash + topUpTotal - totalSpend;
+el("closingCash").textContent=f(closingCash);
+
+el("physicalCash").oninput=()=>{
+  el("variance").textContent=f((Number(el("physicalCash").value)||0)-closingCash);
+};
+
+/* ===== CLOSE DAY (UPDATED LOGIC) ===== */
+el("closeDayBtn").onclick=async()=>{
+  const physical = Number(el("physicalCash").value||0);
+  if(!confirm("Close the day?")) return;
+
+  await updateDoc(cashRef,{
+    closingCash,
+    physicalCash: physical,
+    variance: physical - closingCash,
+    totalSpend,
+    yardTotal,
+    brokerCash,
+    expTotal,
+    closed:true,
+    closedAt:serverTimestamp()
   });
 
-  purchaseTable.innerHTML="";
-  stockSummary.innerHTML="";
+  // 🔁 Create tomorrow opening cash from PHYSICAL cash
+  const tomorrowRef = doc(db,"cash_sessions",uid+"_"+tomorrow);
+  const tomorrowSnap = await getDoc(tomorrowRef);
 
-  if(!todays.length){
-    purchaseTable.innerHTML=`<tr><td colspan="4" class="text-center">No purchases today</td></tr>`;
-    stockSummary.innerHTML=`<li class="list-group-item text-center text-muted">No stock yet</li>`;
-  } else {
-    Object.entries(map)
-      .sort((a,b)=>b[1].last-a[1].last)
-      .forEach(([item,v])=>{
-        const avg=v.weight>0?v.total/v.weight:0;
-        totalPurchases+=v.total;
-
-        purchaseTable.innerHTML+=`
-          <tr>
-            <td><strong>${item}</strong></td>
-            <td>${v.weight.toFixed(2)}</td>
-            <td>${formatKES(avg)}</td>
-            <td>${formatKES(v.total)}</td>
-          </tr>`;
-
-        const ready=v.weight>=STOCK_THRESHOLD;
-        stockSummary.innerHTML+=`
-          <li class="list-group-item d-flex justify-content-between align-items-center ${ready?'list-group-item-success':''}">
-            <span><strong>${item}</strong></span>
-            <span>
-              ${v.weight.toFixed(2)} KG
-              ${ready?'<span class="badge bg-success ms-2">READY FOR SALE</span>':''}
-            </span>
-          </li>`;
-      });
+  if(!tomorrowSnap.exists()){
+    await setDoc(tomorrowRef,{
+      attendantId: uid,
+      date: tomorrow,
+      openingCash: physical,
+      cashTopUps: [],
+      createdAt: serverTimestamp(),
+      closed: false
+    });
   }
 
-  totalPurchasesEl.textContent=formatKES(totalPurchases);
-
-  /* EXPENSES */
-  let totalExpenses=0;
-  expenseTable.innerHTML="";
-  const expSnap=await getDocs(collection(db,"expenses"));
-  expSnap.docs.filter(d=>d.data().attendantId===uid && d.data().date===today)
-    .forEach(d=>{
-      const e=d.data();
-      totalExpenses+=Number(e.amount||0);
-      expenseTable.innerHTML+=`
-        <tr>
-          <td>${e.description||"-"}</td>
-          <td>${formatKES(e.amount)}</td>
-        </tr>`;
-    });
-
-  if(!expenseTable.innerHTML){
-    expenseTable.innerHTML=`<tr><td colspan="2" class="text-center">No expenses today</td></tr>`;
-  }
-
-  totalExpensesEl.textContent=formatKES(totalExpenses);
-
-  const closingCash=openingCash+totalTopUps-(totalPurchases+totalExpenses);
-  closingCashEl.textContent=formatKES(closingCash);
-
-  physicalCashInput.oninput=()=>{
-    varianceEl.textContent=formatKES((physicalCashInput.value||0)-closingCash);
-  };
-
-  closeBtn.onclick=async()=>{
-    if(!confirm("Close the day?")) return;
-    await updateDoc(doc(db,"cash_sessions",uid+"_"+today),{
-      closingCash,
-      totalPurchases,
-      totalExpenses,
-      physicalCash:Number(physicalCashInput.value||0),
-      variance:Number(physicalCashInput.value||0)-closingCash,
-      closed:true,
-      closedAt:serverTimestamp()
-    });
-    alert("Day closed successfully");
-    closeBtn.disabled=true;
-  };
+  alert("Day closed successfully");
+};
 });
 </script>
 
@@ -382,3 +458,4 @@ td[contenteditable="true"]:hover {
   }
 }
 </style>
+
