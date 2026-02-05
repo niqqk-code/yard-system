@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Walk-In Sales</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+
+<div class="container py-4">
+
+  <h5 class="mb-3">🧍 Walk-In Sales</h5>
+
+  <!-- SALE ENTRY -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-body">
+
+      <div class="mb-2">
+        <select id="saleItem" class="form-select">
+          <option value="">Select Item</option>
+        </select>
+      </div>
+
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <input type="number" id="saleWeight" class="form-control" placeholder="Weight (KG)">
+        </div>
+        <div class="col-md-4">
+          <input type="number" id="salePrice" class="form-control" placeholder="Price / KG">
+        </div>
+        <div class="col-md-4">
+          <input id="saleTotal" class="form-control bg-light" readonly placeholder="Total">
+        </div>
+      </div>
+
+      <button class="btn btn-primary w-100" id="addSaleBtn">
+        Add Sale
+      </button>
+
+    </div>
+  </div>
+
+  <!-- TODAY SALES -->
+  <div class="card shadow-sm mb-4">
+    <div class="card-header">📊 Today’s Walk-In Sales</div>
+    <div class="card-body p-0">
+
+      <table class="table table-striped m-0">
+        <thead class="table-light">
+          <tr>
+            <th>Item</th>
+            <th>Weight (KG)</th>
+            <th>Price/KG</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody id="salesTable">
+          <tr><td colspan="4" class="text-center">Loading...</td></tr>
+        </tbody>
+        <tfoot class="table-light">
+          <tr>
+            <th colspan="3">Total Sales</th>
+            <th id="totalSales">0.00</th>
+          </tr>
+        </tfoot>
+      </table>
+
+    </div>
+  </div>
+
+  <a href="dashboard.html" class="btn btn-secondary w-100">⬅ Back to Dashboard</a>
+
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import {
+  getFirestore,
+  collection,
+  addDoc,
+  getDocs,
+  serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const app = initializeApp({
+  apiKey: "AIzaSyCquNEhCHVkSKDcyOqcczE4eSY3lkrAgOk",
+  authDomain: "yard-management-system-8e53a.firebaseapp.com",
+  projectId: "yard-management-system-8e53a"
+});
+
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const saleItem = document.getElementById("saleItem");
+const saleWeight = document.getElementById("saleWeight");
+const salePrice = document.getElementById("salePrice");
+const saleTotal = document.getElementById("saleTotal");
+const salesTable = document.getElementById("salesTable");
+const totalSalesEl = document.getElementById("totalSales");
+
+const today = new Date().toISOString().split("T")[0];
+
+function calcTotal(){
+  saleTotal.value = ((saleWeight.value||0) * (salePrice.value||0)).toFixed(2);
+}
+saleWeight.oninput = calcTotal;
+salePrice.oninput = calcTotal;
+
+function formatKES(n){
+  return Number(n||0).toLocaleString(undefined,{minimumFractionDigits:2});
+}
+
+async function loadItems(){
+  const snap = await getDocs(collection(db,"items"));
+  snap.forEach(d=>{
+    const opt = document.createElement("option");
+    opt.value = d.data().name;
+    opt.textContent = d.data().name;
+    saleItem.appendChild(opt);
+  });
+}
+
+onAuthStateChanged(auth, async user=>{
+  if(!user) location.href="login.html";
+
+  await loadItems();
+  loadSales();
+
+  document.getElementById("addSaleBtn").onclick = async ()=>{
+    if(!saleItem.value) return alert("Select item");
+
+    await addDoc(collection(db,"walkin_sales"),{
+      item: saleItem.value,
+      weightKg: Number(saleWeight.value||0),
+      priceKg: Number(salePrice.value||0),
+      total: Number(saleTotal.value||0),
+      attendantId: user.uid,
+      date: today,
+      createdAt: serverTimestamp()
+    });
+
+    saleWeight.value = salePrice.value = saleTotal.value = "";
+    saleItem.value = "";
+    loadSales();
+  };
+
+  async function loadSales(){
+    salesTable.innerHTML="";
+    let total=0;
+
+    const snap = await getDocs(collection(db,"walkin_sales"));
+    const todaySales = snap.docs.filter(d=>
+      d.data().attendantId===user.uid && d.data().date===today
+    );
+
+    if(!todaySales.length){
+      salesTable.innerHTML = `<tr><td colspan="4" class="text-center">No sales today</td></tr>`;
+    }
+
+    todaySales.forEach(d=>{
+      const s=d.data();
+      total+=Number(s.total||0);
+
+      salesTable.innerHTML+=`
+        <tr>
+          <td>${s.item}</td>
+          <td>${s.weightKg}</td>
+          <td>${formatKES(s.priceKg)}</td>
+          <td>${formatKES(s.total)}</td>
+        </tr>`;
+    });
+
+    totalSalesEl.textContent = formatKES(total);
+  }
+});
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
