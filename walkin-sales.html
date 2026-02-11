@@ -5,6 +5,7 @@
 <title>Walk-In Sales</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="assets/theme.css" rel="stylesheet">
 </head>
 
 <body class="bg-light">
@@ -75,24 +76,14 @@
 </div>
 
 <script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+import { auth, db } from "./assets/firebase.js";
+import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 import {
-  getFirestore,
   collection,
   addDoc,
   getDocs,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-const app = initializeApp({
-  apiKey: "AIzaSyCquNEhCHVkSKDcyOqcczE4eSY3lkrAgOk",
-  authDomain: "yard-management-system-8e53a.firebaseapp.com",
-  projectId: "yard-management-system-8e53a"
-});
-
-const auth = getAuth(app);
-const db = getFirestore(app);
 
 const saleItem = document.getElementById("saleItem");
 const saleWeight = document.getElementById("saleWeight");
